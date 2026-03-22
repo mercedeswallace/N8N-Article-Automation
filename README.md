@@ -21,22 +21,23 @@ An N8N automation that writes, reviews, and publishes a weekly Substack newslett
 <img width="742" height="284" alt="Screenshot 2026-03-22 at 4 43 24 PM" src="https://github.com/user-attachments/assets/bb38512c-0e46-4418-b7dc-8bd9d52ad304" />
 
 
-Every Monday 8am
-  → Pull top idea from Notion (Ideas DB, Status = "Ready", sort by Priority)
-  → Claude writes draft (Anthropic API, claude-sonnet-4-6, 8192 max_tokens)
-  → Parse draft (Code node — extract title/subtitle/body, store in static data)
-  → Save draft to Notion (Drafts DB)
-  → Append blocks to Notion page (3 × 2000-char chunks)
-  → Send review email (Gmail — Approve / Reject links)
+### 
+- Every Monday 8am
+- Pull top idea from Notion (Ideas DB, Status = "Ready", sort by Priority)
+- Claude writes draft (Anthropic API, claude-sonnet-4-6, 8192 max_tokens)
+- Parse draft (Code node — extract title/subtitle/body, store in static data)
+- Save draft to Notion (Drafts DB)
+- Append blocks to Notion page (3 × 2000-char chunks)
+- Send review email (Gmail — Approve / Reject links)
 
 Approval webhook GET /webhook/flowstate-approve
-  → Approved?
-    → [yes] Fetch Notion draft → Get blocks → Assemble body
-            → Convert markdown → ProseMirror JSON
-            → POST to Substack drafts API
-            → Publish to Substack
-            → Mark published in Notion → Success page
-    → [no]  Mark rejected in Notion → Rejection page
+  - Approved?
+    - [yes] Fetch Notion draft → Get blocks → Assemble body
+            - Convert markdown → ProseMirror JSON
+            - POST to Substack drafts API
+            - Publish to Substack
+            - Mark published in Notion → Success page
+    - [no]  Mark rejected in Notion → Rejection page
 
 ## Setup
 
