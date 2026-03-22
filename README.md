@@ -1,4 +1,4 @@
-# Flow State PM — Weekly Article Publisher
+# Automated Weekly Article Product Management Publisher
 
 An N8N automation that writes, reviews, and publishes a weekly Substack newsletter end-to-end using Claude AI, Notion, Gmail, and Substack.
 
