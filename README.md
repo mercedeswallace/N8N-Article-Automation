@@ -18,6 +18,7 @@ An N8N automation that writes, reviews, and publishes a weekly Substack newslett
 
 ## Architecture
 
+<img width="742" height="284" alt="Screenshot 2026-03-22 at 4 43 24 PM" src="https://github.com/user-attachments/assets/bb38512c-0e46-4418-b7dc-8bd9d52ad304" />
 ```
 Every Monday 8am
   → Pull top idea from Notion (Ideas DB, Status = "Ready", sort by Priority)
