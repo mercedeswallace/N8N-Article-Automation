@@ -1,0 +1,741 @@
+{
+  "name": "Flow State PM — Weekly Article Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "b130ad23-6456-441a-8c30-8ddaa47c034b",
+      "name": "Every Monday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_IDEAS_DB_ID"
+        },
+        "limit": 1,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|status",
+              "condition": "equals",
+              "statusValue": "Ready"
+            }
+          ]
+        },
+        "options": {
+          "sort": {
+            "sortValue": [
+              {
+                "key": "Priority|multi_select",
+                "direction": "descending"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ac410463-44b7-4264-91a9-113e9a2a06c2",
+      "name": "Pull top idea from Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        1072
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\"model\":\"claude-sonnet-4-6\",\"max_tokens\":4096,\"system\":\"You are writing as Mercedes, a Principal Product Manager with deep expertise in agentic workflows, AI-native product development, and building entrepreneurial PM careers.\\n\\nHer writing style:\\n- Opens with a sharp, counterintuitive hook (1-2 sentences max)\\n- Uses short paragraphs (2-4 sentences)\\n- Employs callout quotes to highlight key insights\\n- Includes one concrete framework, template, or tool per article\\n- Ends with a clear next action or teaser for the next issue\\n-Tone: direct, experienced, zero fluff\\n- Never uses buzzwords like leverage, synergy, game-changer\\n- Always grounds claims in specific numbers or real scenarios\\n\\nFormat: 1. Title 2. Subtitle 3. Hook 4. 3-4 sections with H2 headings 5. One framework or cheat sheet 6. Closing insight 7. Footer teaser\",\"messages\":[{\"role\":\"user\",\"content\":\"Write a complete Substack article for Flow State PM based on this idea:\\n\\nTitle idea: \"+$json.property_name+\"\\nAngle: \"+$json.property_angle+\"\\nKey insight: \"+$json.property_key_insight+\"\\nTarget reader pain: \"+$json.property_reader_pain+\"\\n\\nWrite the full article now. 800-1000 words. Start directly with the title, no preamble.\"}]}) }}",
+        "options": {}
+      },
+      "id": "fe33cbb0-498d-450a-994a-f33416e84060",
+      "name": "Claude writes draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        1072
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = JSON.parse($input.item.json.body || JSON.stringify($input.item.json));                                                      \n  const content = response.content?.[0]?.text || '';                                                                                           \n                                                                                                                                               \n  const lines = content.split('\\n').filter(l => l.trim());                                                                                     \n  const title = lines[0].replace(/^#+ /, '').trim();                                                                                           \n  const subtitle = lines[1]?.replace(/^#+ /, '').trim() || '';                                                                                 \n  const body = lines.slice(2).join('\\n\\n').trim();\n                                                                                                                                               \n  const staticData = $getWorkflowStaticData('global');\n  staticData.full_draft = content;                                                                                                             \n  staticData.draft_title = title;\n  staticData.draft_subtitle = subtitle;                                                                                                        \n   \n  return { title, subtitle, body, full_draft: content, word_count: content.split(/\\s+/).length, generated_at: new Date().toISOString() };      \n          "
+      },
+      "id": "112885e7-0765-42c2-a490-8dcc863de3cc",
+      "name": "Parse draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_DRAFTS_DB_ID"
+        },
+        "title": "=Draft — {{ $json.title }} ({{ $now.toFormat('yyyy-MM-dd') }})",
+        "propertiesUi": {
+          "propertyValues": []
+        },
+        "options": {}
+      },
+      "id": "7b039a2d-8c63-47da-bf72-68224c7af71f",
+      "name": "Save draft to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1216,
+        944
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_GMAIL_ADDRESS",
+        "subject": "=✍️ Flow State PM Draft Ready — {{ $('Parse draft').item.json.title }}",
+        "message": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #1a1a1a;\"><h2                     \n  style=\"color:#0099FF;\">Your weekly draft is ready for review</h2><p><strong>Title:</strong> {{ $('Parse draft').item.json.title              \n  }}</p><p><strong>Subtitle:</strong> {{ $('Parse draft').item.json.subtitle }}</p><p><strong>Word count:</strong> {{ '' + $('Parse draft').item.json.word_count }}</p><hr style=\"border:1px solid #eee; margin: 24px 0;\"/><p>Read the full draft in Notion, then approve or     \n  reject below:</p><a href=\"{{ $('Save draft to Notion').item.json.url }}\" style=\"display:inline-block; background:#333; color:white;\n  padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:bold; margin-right:12px; margin-bottom:16px;\">Open in\n  Notion</a><br/><a href=\"{{ 'http://localhost:5678/webhook/flowstate-approve?draft_id=' + $('Save draft to Notion').item.json.id +\n  '&action=approve' }}\" style=\"display:inline-block; background:#0099FF; color:white; padding:12px 28px; border-radius:6px;\n  text-decoration:none; font-weight:bold; margin-right:12px;\">Approve and Publish</a><a href=\"{{\n  'http://localhost:5678/webhook/flowstate-approve?draft_id=' + $('Save draft to Notion').item.json.id + '&action=reject' }}\"\n  style=\"display:inline-block; background:#f5f5f5; color:#333; padding:12px 28px; border-radius:6px; text-decoration:none;\n  font-weight:bold;\">Reject</a></body></html>",
+        "options": {}
+      },
+      "id": "7a655514-1b4c-4e3a-8a68-ef2de72c3457",
+      "name": "Send draft for review",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1648,
+        944
+      ],
+      "webhookId": "ae3c6022-f14c-4a21-a88a-d38e43fe7010",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "flowstate-approve",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a4145bf0-0ba7-4322-87e1-cfa5f09e1833",
+      "name": "Approval webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        336,
+        1392
+      ],
+      "webhookId": "flowstate-approve"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-action",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a001eec5-9c9f-4d41-b68d-2e88f36b39c1",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "get",
+        "pageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.query.draft_id }}",
+          "__regex": "^([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})"
+        }
+      },
+      "id": "a1869291-b800-4332-89a3-ac29d92bde46",
+      "name": "Fetch final draft from Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        1296
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "operation": "getAll",
+        "blockId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Fetch final draft from Notion').item.json.id }}"
+        },
+        "returnAll": true
+      },
+      "id": "2f2d98e2-d1a7-43c4-b28d-180d9fe3a3e0",
+      "name": "Get draft blocks",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        992,
+        1296
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');                                                                                         \n  const page = $('Fetch final draft from Notion').first().json;\n\n  const title = page.name || staticData.draft_title || '';                                                                                     \n  const subtitle = page.property_subtitle || staticData.draft_subtitle || '';\n  const body = $('Get draft blocks').all().map(item => item.json.content).join('\\n\\n');                                                        \n                                                                                                                                               \n  return { title, subtitle, body };"
+      },
+      "id": "20fcea21-5723-4fa3-8837-a48ec02ecfd6",
+      "name": "Assemble draft body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        1296
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://flowstatepm.substack.com/api/v1/drafts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cookie",
+              "value": "YOUR_SUBSTACK_COOKIE_STRING"
+            },
+            {
+              "name": "Origin",
+              "value": "https://flowstatepm.substack.com"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "*/*"
+            },
+            {
+              "name": "Referer",
+              "value": "https://flowstatepm.substack.com/publish/post"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={               \n    \"draft_title\": \"{{ $json.title }}\",                                                                                                        \n    \"draft_subtitle\": \"{{ $json.subtitle }}\",                                                                                                  \n    \"draft_body\": \"{{ $json.draft_body }}\",                                                                                                    \n    \"draft_bylines\": [],                                                                                                                       \n    \"audience\": \"everyone\",\n    \"section_chosen\": false\n  }",
+        "options": {}
+      },
+      "id": "4d98abd6-a020-46ff-a36f-82c28ffb22e5",
+      "name": "Create Substack draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1648,
+        1216
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.substack.com/api/v1/drafts/{{ $json.id }}/publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cookie",
+              "value": "YOUR_SUBSTACK_COOKIE_STRING"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{ \"send_email\": true }",
+        "options": {}
+      },
+      "id": "d567038a-26a4-4894-a2d8-cfc3d5d5510f",
+      "name": "Publish to Substack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1872,
+        1408
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID_2",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "archive",
+        "pageId": {
+          "__rl": true,
+          "value": "=={{ $('Approval webhook').item.json.query.draft_id }}",
+          "mode": "id"
+        }
+      },
+      "id": "5e161cee-8bd7-4ffb-8e7a-4571eefe4788",
+      "name": "Mark published in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2096,
+        1408
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<html><body style=\"font-family:Arial;text-align:center;padding:60px;\"><h2 style=\"color:#0099FF;\">✅ Published!</h2><p>\"{{ $('Assemble draft body').item.json.title }}\" is live on Substack.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "1ecc9b32-0593-442f-9ecc-76f863f69f5f",
+      "name": "Success response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2320,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "archive",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Approval webhook').item.json.query.draft_id }}",
+          "mode": "id"
+        }
+      },
+      "id": "39a71674-a0ea-47e9-9e96-d59b235cd138",
+      "name": "Mark rejected in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        1504
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html><body style=\"font-family:Arial;text-align:center;padding:60px;\"><h2 style=\"color:#666;\">Draft rejected.</h2><p>Status updated in Notion. The idea is back in your queue.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "1ae39626-6f9e-4fbf-82f2-45374a4dc02f",
+      "name": "Reject response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        992,
+        1504
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "blockId": {
+          "__rl": true,
+          "value": "={{ $('Save draft to Notion').item.json.id }}",
+          "mode": "id"
+        },
+        "blockUi": {
+          "blockValues": [
+            {
+              "textContent": "={{ $('Parse draft').item.json.full_draft.substring(0, 2000) }}"
+            },
+            {
+              "textContent": "={{ $('Parse draft').item.json.full_draft.substring(2000, 4000) \n\n ' ' }}"
+            },
+            {
+              "textContent": "={{ $('Parse draft').item.json.full_draft.substring(4000, 6000) \n\n ' ' }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1424,
+        944
+      ],
+      "id": "db712a28-8b92-4d52-89ef-8514cc00fe38",
+      "name": "Append a block",
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || '';                                                                                                               \n  const paragraphs = body.split('\\n\\n').filter(p => p.trim());                                                                                 \n                                                                                                                                               \n  const content = paragraphs.map(p => {                                                                                                        \n    const trimmed = p.trim();                                                                                                                  \n    if (trimmed.startsWith('## ')) {                                                                                                           \n      return { type: 'heading', attrs: { level: 2, textAlign: null }, content: [{ type: 'text', text: trimmed.slice(3) }] };                   \n    }                                                                                                                                          \n    if (trimmed.startsWith('# ')) {                                                                                                            \n      return { type: 'heading', attrs: { level: 1, textAlign: null }, content: [{ type: 'text', text: trimmed.slice(2) }] };                   \n    }                                                                                                                                          \n    if (trimmed.startsWith('> ')) {\n      return { type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: trimmed.slice(2) }] }] };                    \n    }                                                                                                                                          \n    return { type: 'paragraph', attrs: { textAlign: null }, content: [{ type: 'text', text: trimmed }] };                                      \n  });                                                                                                                                          \n                                                                                                                                               \n  return {                                                                                                                                     \n    title: $json.title,                                                                                                                        \n    subtitle: $json.subtitle,                                                                                                                  \n    draft_body: JSON.stringify({ type: 'doc', content: content.length ? content : [{ type: 'paragraph', attrs: { textAlign: null } }] })       \n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        1296
+      ],
+      "id": "3dfc339e-3eb6-4a67-ac4e-2a67a9a523a9",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Monday 8am": {
+      "main": [
+        [
+          {
+            "node": "Pull top idea from Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pull top idea from Notion": {
+      "main": [
+        [
+          {
+            "node": "Claude writes draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude writes draft": {
+      "main": [
+        [
+          {
+            "node": "Parse draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse draft": {
+      "main": [
+        [
+          {
+            "node": "Save draft to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save draft to Notion": {
+      "main": [
+        [
+          {
+            "node": "Append a block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval webhook": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Fetch final draft from Notion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark rejected in Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch final draft from Notion": {
+      "main": [
+        [
+          {
+            "node": "Get draft blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get draft blocks": {
+      "main": [
+        [
+          {
+            "node": "Assemble draft body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble draft body": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Substack draft": {
+      "main": [
+        [
+          {
+            "node": "Publish to Substack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to Substack": {
+      "main": [
+        [
+          {
+            "node": "Mark published in Notion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Success response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark rejected in Notion": {
+      "main": [
+        [
+          {
+            "node": "Reject response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append a block": {
+      "main": [
+        [
+          {
+            "node": "Send draft for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create Substack draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "76512f42-96c7-4104-91ae-eb6f78a1146f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "afe6df3cbb14b74b275266a2cbba5e1c82303cf9464b8b50e48be67ff38fc83b"
+  },
+  "id": "LCMJPEPPtRpd2f6f",
+  "tags": [
+    {
+      "updatedAt": "2026-03-15T13:48:39.871Z",
+      "createdAt": "2026-03-15T13:48:39.871Z",
+      "id": "5L4MHAL4aPGu57wN",
+      "name": "publishing"
+    },
+    {
+      "updatedAt": "2026-03-15T13:48:39.865Z",
+      "createdAt": "2026-03-15T13:48:39.865Z",
+      "id": "mhByTmI29oSVLQED",
+      "name": "content"
+    }
+  ]
+}
